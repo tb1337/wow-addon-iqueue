@@ -1,4 +1,4 @@
-package-as: iQueue-MoP
+package-as: iQueue
 
 externals:
   Libs/CallbackHandler-1.0:
