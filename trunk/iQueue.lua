@@ -259,6 +259,8 @@ function iQueue:CheckWorldPvPStatus()
 	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 4 ) then
 		self:CheckWorldPvPAlert(2); -- Tol Barad
 	end
+	
+	self:EventHandler("SELF_DUMP");
 end
 
 function iQueue:CheckWorldPvPAlert(index)
@@ -266,7 +268,6 @@ function iQueue:CheckWorldPvPAlert(index)
 	
 	if( canEnter ) then		
 		if( isActive or canQueue or startTime <= 900 ) then
-			--Queues[QUEUE_PVP + index] = STATUS_AVAIL;
 			self["WorldPvP"..locName] = 1;
 			
 			if( (time() - self.db.WorldPvPLastAlert[index]) >= 3600 ) then
@@ -330,7 +331,8 @@ function iQueue:EventHandler(event)
 			
 			local area = 0;
 			for j = 1, 2 do
-				if( select(2, _G.GetWorldPVPAreaInfo(j)) == mapName ) then
+				local _, locName = _G.GetWorldPVPAreaInfo(j);
+				if( locName == mapName ) then
 					area = j;
 				end
 			end
