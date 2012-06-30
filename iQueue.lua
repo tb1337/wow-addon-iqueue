@@ -95,8 +95,9 @@ iQueue.Feed.OnClick = function(anchor, button)
 end
 
 iQueue.Feed.OnEnter = function(anchor)
-	-- does not show mouseover tooltip when not queued or if Blizzard tooltip is visible
-	if( not iQueue:IsQueued() or _G["DropDownList1"]:IsVisible() ) then
+	-- does not show mouseover tooltip when not queued (or just available queue) or if Blizzard tooltip is visible
+	local queued = iQueue:IsQueued();
+	if( not queued or queued == 2 or _G["DropDownList1"]:IsVisible() ) then
 		return;
 	end
 	
@@ -375,14 +376,20 @@ end
 -- UpdateBroker
 ----------------------
 
-function iQueue:IsQueued() -- returns 1 if queued somewhere, nil otherwise
+function iQueue:IsQueued() -- returns 1 if queued somewhere (2 if just available queue), nil otherwise
+	local answer;
+	
 	for i, v in ipairs(Queues) do
-		if( v ~= STATUS_NONE ) then
-			return 1;
+		if( v > STATUS_NONE ) then
+			if( v == STATUS_AVAIL and not answer ) then
+				answer = 2;
+			elseif( v > STATUS_AVAIL ) then
+				answer = 1;
+			end
 		end
 	end
 	
-	return;
+	return answer;
 end
 
 function iQueue:UpdateBroker()
