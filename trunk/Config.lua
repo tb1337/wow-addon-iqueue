@@ -25,7 +25,34 @@ local function CreateConfig()
 				name = "General",
 				order = 10,
 				args = {
-					
+					LeaveDungeonWhenFinished = {
+						type = "toggle",
+						name = "Do something when a dungeon is cleared",
+						order = 10,
+						width = "double",
+						get = function()
+							return iQueue.db.LeaveDungeonWhenFinished;
+						end,
+						set = function(info, value)
+							iQueue.db.LeaveDungeonWhenFinished = value;
+							iQueue:DungeonComplete();
+						end,
+					},
+					LeaveDungeonAction = {
+						type = "select",
+						name = "Action:",
+						order = 11,
+						get = function()
+							return iQueue.db.LeaveDungeonAction;
+						end,
+						set = function(info, value)
+							iQueue.db.LeaveDungeonAction = value;
+						end,
+						values = {
+							[1] = "Show Popup",
+							[2] = "Auto Leave",
+						},
+					},
 				},
 			},
 			GroupWorldPvP = {
@@ -99,6 +126,8 @@ function iQueue:CreateDB()
 	iQueue.CreateDB = nil;
 	
 	return { profile = {
+		LeaveDungeonWhenFinished = true,
+		LeaveDungeonAction = 1,
 		WatchWorldPvP = false,
 		WorldPvPTimer = false,
 		WorldPvPPopup = 2,

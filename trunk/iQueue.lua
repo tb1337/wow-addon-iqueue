@@ -59,17 +59,37 @@ iQueue.Feed = LibStub("LibDataBroker-1.1"):NewDataObject(AddonName, {
 });
 
 iQueue.Feed.OnClick = function(anchor, button)
-	iQueue.Feed.OnLeave(anchor);
-	
-	_G.QueueStatusDropDown_Show(_G.QueueStatusMinimapButton.DropDown, anchor:GetName());
-	
-	if( not _G["DropDownList1"]:IsVisible() ) then
-		iQueue.Feed.OnEnter(anchor);
+	if( button == "LeftButton" ) then
+		if( _G.IsModifierKeyDown() ) then
+			if( _G.IsShiftKeyDown() ) then
+				_G.ToggleLFDParentFrame();
+			end
+		else
+			if( not iQueue:IsQueued() ) then
+				return;
+			end
+			
+			iQueue.Feed.OnLeave(anchor);
+			
+			_G.QueueStatusDropDown_Show(_G.QueueStatusMinimapButton.DropDown, anchor:GetName());
+			
+			if( not _G["DropDownList1"]:IsVisible() ) then
+				iQueue.Feed.OnEnter(anchor);
+			end
+		end
+	elseif( button == "RightButton" ) then
+		if( _G.IsModifierKeyDown() ) then
+			if( _G.IsShiftKeyDown() ) then
+				_G.TogglePVPFrame();
+			end
+		else
+			iQueue:OpenOptions();
+		end
 	end
 end
 
 iQueue.Feed.OnEnter = function(anchor)
-	if( _G["DropDownList1"]:IsVisible() ) then
+	if( not iQueue:IsQueued() or _G["DropDownList1"]:IsVisible() ) then
 		return;
 	end
 	
@@ -118,11 +138,73 @@ function iQueue:OnInitialize()
 	self:RegisterEvent("LFG_PROPOSAL_SHOW", "EventHandler");
 	self:RegisterEvent("LFG_QUEUE_STATUS_UPDATE", "EventHandler");
 	
+	self:DungeonComplete();
+	
 	-- PvP
 	self:RegisterEvent("UPDATE_BATTLEFIELD_STATUS", "EventHandler");
 	
 	-- World PvP
 	self:WatchWorldPvP();
+end
+
+function iQueue:DungeonComplete()
+	if( self.db.LeaveDungeonWhenFinished ) then
+		self:RegisterEvent("LFG_COMPLETION_REWARD", "_DungeonComplete");
+	else
+		self:UnregisterEvent("LFG_COMPLETION_REWARD");
+	end
+end
+
+function iQueue:_DungeonComplete(event, ...)
+	if( event == "LFG_COMPLETION_REWARD") then
+		self:RegisterEvent("START_LOOT_ROLL", "_DungeonComplete");
+	elseif( event == "START_LOOT_ROLL" ) then
+		self.WatchLootRoll = select(1, ...);
+		self:RegisterEvent("CHAT_MSG_LOOT", "_DungeonComplete");
+	elseif( event == "CHAT_MSG_LOOT") then
+		local looting;
+		for i = 1, self.WatchLootRoll do
+			if( _G.GetLootRollItemInfo(i) ) then
+				looting = 1;
+			end
+		end
+		
+		if( not looting ) then
+			self:UnregisterEvent("CHAT_MSG_LOOT");
+			self:UnregisterEvent("START_LOOT_ROLL");
+			self.WatchLootRoll = nil;
+			
+			if( self.db.LeaveDungeonAction == 1 ) then
+				_G.StaticPopup_Show("IQUEUE_DUNGEONEND");
+			else
+				_G.LeaveParty();
+			end
+		end
+	end
+	
+	
+	local lootInProgress = false
+	for i = 1, lootMaxID do
+		if GetLootRollItemInfo(i) then
+			lootInProgress = true
+			break
+		end
+	end
+	if lootInProgress == false then
+		EQ:UnregisterEvent("CHAT_MSG_LOOT")
+		EQ:UnregisterEvent("START_LOOT_ROLL")		
+		if EQ.db.profile.LeavePrompt then
+			StaticPopup_Show ("LEAVEAFTER")
+		else
+			if EQ.db.profile.FarewellEnabled then 
+				SendChatMessage(EQ.db.profile.FarewellText ,"PARTY") 
+				Sleep(1.0, function() LeaveParty() end)
+			else
+				LeaveParty()
+			end
+		end
+		lfgLeavingParty = false
+	end
 end
 
 function iQueue:WatchWorldPvP()
@@ -182,9 +264,7 @@ end
 function iQueue:CheckWorldPvPAlert(index)
 	local pvpID, locName, isActive, canQueue, startTime, canEnter = _G.GetWorldPVPAreaInfo(index);
 	
-	if( canEnter ) then
-		--print(locName..": Active="..(isActive and "1" or "nil").." Queue="..(canQueue and "1" or "nil").." Time="..startTime)
-		
+	if( canEnter ) then		
 		if( isActive or canQueue or startTime <= 900 ) then
 			--Queues[QUEUE_PVP + index] = STATUS_AVAIL;
 			self["WorldPvP"..locName] = 1;
@@ -357,5 +437,18 @@ _G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"] = {
 	hideOnEscape = true,
 	OnAccept = function(self)
 		_G.TogglePVPFrame();
+	end,
+};
+
+_G.StaticPopupDialogs["IQUEUE_DUNGEONEND"] = {
+	preferredIndex = 3, -- apparently avoids some UI taint
+	text = "The dungeon is cleared and loot is assigned to players. Leave group?",
+	button1 = "Yes",
+	button2 = "No",
+	timeout = 900,
+	whileDead = true,
+	hideOnEscape = true,
+	OnAccept = function(self)
+		_G.LeaveParty();
 	end,
 };
