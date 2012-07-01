@@ -133,10 +133,6 @@ function iQueue:OnInitialize()
 
 	self:UpdateBroker(); -- initially shows no queues and a grey icon
 	
-	--@alpha@
-	print("|cff00ffff"..AddonName.."|r: This addon version works for the Mists of Pandaria Beta. If you encounter errors, check back on www.curseforge.com");
-	--@end-alpha@
-	
 	-- All
 	self:RegisterEvent("PLAYER_ENTERING_WORLD", "EventHandler"); -- initial check if the player is in a queue
 	self:RegisterEvent("GROUP_ROSTER_UPDATE", "EventHandler"); -- when leaving a battlefield, no event is fired. So we check the group.
