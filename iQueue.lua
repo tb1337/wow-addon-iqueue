@@ -337,6 +337,13 @@ function iQueue:EventHandler(event)
 			local status, mapName = _G.GetWorldPVPQueueStatus(i);
 			local newStatus;
 			
+			-- this is our transporter variable. If it is set, the queue is active!
+			if( mapName and self["WorldPvP"..mapName] ) then
+				newStatus = STATUS_AVAIL;
+			else
+				newStatus = STATUS_NONE; -- otherwise STATUS_NONE is set.
+			end
+			
 			-- The only way to identify a queued World PvP Area is to check its localized map name (e.g. Tol Barad)
 			-- Why? Well, I hardcoded WG/TB queue IDs (6 and 7), but GetWorldPVPQueueStatus() may also return TB as ID 1 (= 6 in iQueue, which is WG!)			
 			local area = 0;
@@ -349,13 +356,6 @@ function iQueue:EventHandler(event)
 			
 			-- if we identified the queue, we store the queue status for it.
 			if( area ~= 0 ) then
-				-- this is our transporter variable. If it is set, the queue is active!
-				if( self["WorldPvP"..mapName] ) then
-					newStatus = STATUS_AVAIL;
-				else
-					newStatus = STATUS_NONE; -- otherwise STATUS_NONE is set.
-				end
-				
 				if( _G.GetRealZoneText() == mapName ) then -- World PvP Areas have no "active" state in the Blizzard API, so we emulate it.
 					newStatus = STATUS_ACTIVE; -- iQueue assumes that you are playing a World PvP Area, if you are in the area.
 				elseif( status == "confirm" ) then
