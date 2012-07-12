@@ -510,7 +510,7 @@ end
 
 _G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"] = {
 	preferredIndex = 3, -- apparently avoids some UI taint
-	button1 = _G.OK,
+	button1 = _G.OKAY,
 	button2 = _G.CANCEL,
 	timeout = 900,
 	whileDead = true,
