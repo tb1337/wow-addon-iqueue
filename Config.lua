@@ -13,8 +13,6 @@ local _G = _G;
 --------------------------
 
 function iQueue:CreateDB()
-	iQueue.CreateDB = nil;
-	
 	return { profile = {
 		LeaveDungeonWhenFinished = true,
 		LeaveDungeonAction = 1,
@@ -30,27 +28,28 @@ end
 ---------------------------------
 
 local function CreateConfig()
-	CreateConfig = nil; -- we just need this function once, thus removing it from memory.
-
-	local db = {
+	return {
 		type = "group",
 		name = AddonName,
 		order = 1,
-		childGroups = "tab",
+		get = function(info)
+			return iQueue.db[info[#info]];
+		end,
+		set = function(info, value)
+			iQueue.db[info[#info]] = value;
+		end,
 		args = {
 			GroupGeneral = {
 				type = "group",
-				name = "General",
+				name = L["General Options"],
 				order = 10,
+				inline = true,
 				args = {
 					LeaveDungeonWhenFinished = {
 						type = "toggle",
-						name = "Do something when a dungeon is cleared",
+						name = L["When a dungeon is cleared, do:"],
 						order = 10,
 						width = "double",
-						get = function()
-							return iQueue.db.LeaveDungeonWhenFinished;
-						end,
 						set = function(info, value)
 							iQueue.db.LeaveDungeonWhenFinished = value;
 							iQueue:DungeonComplete();
@@ -58,40 +57,32 @@ local function CreateConfig()
 					},
 					LeaveDungeonAction = {
 						type = "select",
-						name = "Action:",
+						name = L["Action"],
 						order = 11,
-						get = function()
-							return iQueue.db.LeaveDungeonAction;
-						end,
-						set = function(info, value)
-							iQueue.db.LeaveDungeonAction = value;
-						end,
 						values = {
-							[1] = "Show Popup",
-							[2] = "Auto Leave",
+							[1] = L["Show Popup"],
+							[2] = L["Auto-leave Group"],
 						},
 					},
 				},
 			},
 			GroupWorldPvP = {
 				type = "group",
-				name = "World PvP",
+				name = L["World PvP Zones"],
 				order = 20,
+				inline = true,
 				args = {
 					Description1 = {
 						type = "description",
-						name = "As of Mists of Pandaria, World PvP Areas are deprecated. If you would like to farm achievements or something else, you may enable World PvP handling in iQueue.".."\n",
-						fontSize = "medium",
+						name = L["As of Mists of Pandaria, World PvP Zones are deprecated. If you would like to farm achievements or something else, you may enable World PvP handling in iQueue."].."\n",
+						fontSize = "small",
 						order = 10,
 					},
 					WatchWorldPvP = {
 						type = "toggle",
-						name = "Enable handling for World PvP Areas",
+						name = L["Enable handling for World PvP Zones"],
 						order = 20,
 						width = "full",
-						get = function()
-							return iQueue.db.WatchWorldPvP;
-						end,
 						set = function(info, value)
 							iQueue.db.WatchWorldPvP = value;
 							iQueue:WatchWorldPvP();
@@ -104,12 +95,9 @@ local function CreateConfig()
 					},
 					WorldPvPTimer = {
 						type = "toggle",
-						name = "Alert when the queue for a World PvP Area recently opened.",
+						name = L["Alert when a WG/TB queue opened!"],
 						order = 40,
-						width = "full",
-						get = function()
-							return iQueue.db.WorldPvPTimer;
-						end,
+						width = "double",
 						set = function(info, value)
 							iQueue.db.WorldPvPTimer = value;
 							iQueue:WatchWorldPvP();
@@ -117,27 +105,19 @@ local function CreateConfig()
 					},
 					WorldPvPPopup = {
 						type = "select",
-						name = "Popup message for:",
+						name = L["Popup message for:"],
 						order = 41,
-						get = function()
-							return iQueue.db.WorldPvPPopup;
-						end,
-						set = function(info, value)
-							iQueue.db.WorldPvPPopup = value;
-						end,
 						values = {
-							[1] = "None",
-							[2] = "All",
-							[3] = "Wintergrasp",
-							[4] = "Tol Barad",
+							[1] = _G.NONE,
+							[2] = _G.ALL,
+							[3] = L["Only Wintergrasp"],
+							[4] = L["Only Tol Barad"],
 						},
 					},
 				},
 			},
 		},
 	};
-	
-	return db;
 end
 
 function iQueue:OpenOptions()

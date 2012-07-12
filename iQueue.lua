@@ -52,7 +52,6 @@ local Queues = { -- Stores a status for each queue category, defaults to STATUS_
 	[QUEUE_WG]  = STATUS_NONE,
 	[QUEUE_TB]	= STATUS_NONE,
 };
-_G.Q = Queues;
 
 -----------------------------
 -- Setting up the LDB
@@ -289,7 +288,7 @@ function iQueue:AnimateEye(state)
 	else
 		self.animEye = nil;
 		
-		self.ldb.icon = path..(state == false and "eye1" or "off");
+		self.ldb.icon = path..(state == false and "1" or "off");
 		
 		if( EyeTimer ) then
 			self:CancelTimer(EyeTimer);
@@ -399,13 +398,14 @@ end
 local function check_world_pvp_alert(index)
 	local pvpID, locName, isActive, canQueue, startTime, canEnter = _G.GetWorldPVPAreaInfo(index);
 	
-	if( canEnter ) then -- if the player cannot enter the World PvP Area, we don't check it
+	if( canEnter and startTime ~= 0 ) then -- if the player cannot enter the World PvP Area, we don't check it
 		if( isActive or canQueue or startTime <= 900 ) then
 			iQueue["WorldPvP"..locName] = 1; -- I don't wanna set the queue status here, so we set a transporter variable
 			iQueue:EventHandler(iQueue, "SELF_WORLD_PVP_QUEUE_OPEN");
 			
 			-- remembers the player to queue for the World PvP Area
 			if( (time() - iQueue.db.WorldPvPLastAlert[index]) >= 3600 ) then
+				_G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"].text = (L["Queue for %s has opened!"]):format(locName);
 				_G.StaticPopup_Show("IQUEUE_WORLDPVPALARM");
 				iQueue.db.WorldPvPLastAlert[index] = time(); -- we just want this popup once
 			end
@@ -416,12 +416,10 @@ local function check_world_pvp_alert(index)
 end
 
 function iQueue:CheckWorldPvPStatus()
-	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 3 ) then
-		check_world_pvp_alert(1); -- Wintergrasp
-	end
-	
-	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 4 ) then
-		check_world_pvp_alert(2); -- Tol Barad
+	for i = 1, 2 do -- 1 WG, 2 TB
+		if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == (2 + i) ) then
+			check_world_pvp_alert(i);
+		end
 	end
 end
 
@@ -445,14 +443,14 @@ end
 
 local function get_queue_name(queue)
 	-- simply gets an abbreviation for the queue (e.g. Looking for Dungeon = LFG)
-	if    ( queue == QUEUE_LFG ) then return "LFG"
-	elseif( queue == QUEUE_RF  ) then return "RF"
-	elseif( queue == QUEUE_SCE ) then return "SCE"
-	elseif( queue == QUEUE_LFR ) then return "LFR"
-	elseif( queue == QUEUE_PVP ) then return "PvP"
+	if    ( queue == QUEUE_LFG ) then return L["LFG"]
+	elseif( queue == QUEUE_RF  ) then return L["RF"]
+	elseif( queue == QUEUE_SCE ) then return L["SCE"]
+	elseif( queue == QUEUE_LFR ) then return L["LFR"]
+	elseif( queue == QUEUE_PVP ) then return _G.PVP
 	elseif( queue  > QUEUE_PVP ) then -- uhhh... hard coding sucks -.-
-		if(     (queue - QUEUE_PVP) == 1 ) then return "WG"
-		elseif( (queue - QUEUE_PVP) == 2 ) then return "TB"
+		if(     (queue - QUEUE_PVP) == 1 ) then return L["WG"]
+		elseif( (queue - QUEUE_PVP) == 2 ) then return L["TB"]
 		end
 	else
 		return _G.UNKNOWN; -- should NEVER happen!
@@ -512,8 +510,7 @@ end
 
 _G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"] = {
 	preferredIndex = 3, -- apparently avoids some UI taint
-	text = "A World PvP Area is ready to be queued!",
-	button1 = "Enter",
+	button1 = _G.OK,
 	button2 = _G.CANCEL,
 	timeout = 900,
 	whileDead = true,
@@ -525,7 +522,7 @@ _G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"] = {
 
 _G.StaticPopupDialogs["IQUEUE_DUNGEONEND"] = {
 	preferredIndex = 3, -- apparently avoids some UI taint
-	text = "The dungeon is cleared and loot is assigned to players. Leave group?",
+	text = L["The dungeon is cleared and loot is assigned to players. Leave group?"],
 	button1 = _G.YES,
 	button2 = _G.NO,
 	timeout = 900,
