@@ -2,7 +2,6 @@ package-as: iQueue
 enable-nolib-creation: no
 
 ignore:
-  - Libs/AceAddon-3.0
   - Libs/AceConfig-3.0
   - Libs/AceDB-3.0
   - Libs/AceEvent-3.0
@@ -10,7 +9,9 @@ ignore:
   - Libs/AceLocale-3.0
   - Libs/AceTimer-3.0
   - Libs/CallbackHandler-1.0
+  - Libs/LibCrayon-3.0
   - Libs/LibStub
+  - Libs/iLib
 
 
 externals:
@@ -18,8 +19,8 @@ externals:
     url: svn://svn.wowace.com/wow/callbackhandler/mainline/trunk
   Libs/LibStub:
     url: svn://svn.wowace.com/wow/libstub/mainline/trunk
-  Libs/LibQTip-1.0:
-    url: svn://svn.wowace.com/wow/libqtip-1-0/mainline/trunk
+  Libs/LibCrayon-3.0:
+    url: svn://svn.wowace.com/wow/libcrayon-3-0/mainline/trunk
   Libs/AceAddon-3.0:
     url: svn://svn.wowace.com/wow/ace3/mainline/trunk/AceAddon-3.0
   Libs/AceGUI-3.0:
@@ -35,8 +36,9 @@ externals:
   Libs/AceTimer-3.0:
     url: svn://svn.wowace.com/wow/ace3/mainline/trunk/AceTimer-3.0
 
-required-dependencies:
-  - libstub
+optional-dependencies:
+  - ilib
+  - libcrayon-3-0
 
 tools-used:
   - libdatabroker-1-1

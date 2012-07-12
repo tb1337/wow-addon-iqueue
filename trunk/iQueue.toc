@@ -1,18 +1,19 @@
 ## Interface: 50001
 ## Title: i|cffffffaaQueue|r
-## Version: 2.0.0
+## Version: 2.0.1
 ## Notes: The ultimate LFD and PvP Queue LDB addon!
 ## Author: grdn
 ## SavedVariables: iQueueDB
+## OptionalDeps: Ace3, iLib, LibCrayon-3.0
 
 # Libraries
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\LibStub\Libstub.lua
 Libs\libdatabroker-1-1\LibDataBroker-1.1.lua
 
-Libs\LibQTip-1.0\lib.xml
+Libs\iLib\lib.xml
+Libs\LibCrayon-3.0\lib.xml
 
-Libs\AceAddon-3.0\AceAddon-3.0.xml
 Libs\AceGUI-3.0\AceGUI-3.0.xml
 Libs\AceConfig-3.0\AceConfig-3.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
