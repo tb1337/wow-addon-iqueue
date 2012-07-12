@@ -2,29 +2,35 @@
 -- Setting up scope and libs
 -----------------------------------
 
-local AddonName = select(1, ...);
-iQueue = LibStub("AceAddon-3.0"):NewAddon(AddonName, "AceEvent-3.0");
+local AddonName, iQueue = ...;
+LibStub("AceEvent-3.0"):Embed(iQueue);
+LibStub("AceTimer-3.0"):Embed(iQueue);
 
 local L = LibStub("AceLocale-3.0"):GetLocale(AddonName);
 
-local LibQTip = LibStub("LibQTip-1.0");
+local LibCrayon = LibStub("LibCrayon-3.0");
 
-local _G = _G; -- I always use _G.func on global functions
+local _G = _G;
+
+-------------------------------
+-- Registering with iLib
+-------------------------------
+
+LibStub("iLib"):Register(AddonName);
 
 -----------------------------------------
 -- Variables, functions and colors
 -----------------------------------------
+
+local EyeTimer; -- the timer for our animated eyeball
 
 local COLOR_RED  = "|cffff0000%s|r";
 local COLOR_GREEN= "|cff00ff00%s|r";
 local COLOR_YELLOW= "|cffffff00%s|r";
 local COLOR_GREY = "|cffaaaaaa%s|r";
 
-local ICON_LFG_ON = "Interface\\Addons\\iQueue\\Images\\LFG-On";
-local ICON_LFG_OFF = "Interface\\Addons\\iQueue\\Images\\LFG-Off";
-
 local STATUS_NONE = 0; -- set if queue isn't active
-local STATUS_AVAIL = 1; -- only WG/TB: queue is available
+local STATUS_PAUSED = 1; -- WG/TB: Queue available, all others: paused
 local STATUS_QUEUED = 2; -- set if queued
 local STATUS_PROPOSAL = 3; -- set if invite is pending
 local STATUS_ACTIVE = 4; -- set if in assembled group
@@ -46,18 +52,18 @@ local Queues = { -- Stores a status for each queue category, defaults to STATUS_
 	[QUEUE_WG]  = STATUS_NONE,
 	[QUEUE_TB]	= STATUS_NONE,
 };
-iQueue.Q = Queues; -- for debugging purposes
+_G.Q = Queues;
 
 -----------------------------
--- Setting up the feed
+-- Setting up the LDB
 -----------------------------
 
-iQueue.Feed = LibStub("LibDataBroker-1.1"):NewDataObject(AddonName, {
+iQueue.ldb = LibStub("LibDataBroker-1.1"):NewDataObject(AddonName, {
 	type = "data source",
 	text = "",
 });
 
-iQueue.Feed.OnClick = function(anchor, button)
+iQueue.ldb.OnClick = function(anchor, button)
 	-- left click
 	if( button == "LeftButton" ) then
 		-- on CTRL/ALT/Shift pressed
@@ -72,11 +78,11 @@ iQueue.Feed.OnClick = function(anchor, button)
 				return;
 			end
 			
-			iQueue.Feed.OnLeave(anchor); -- hides the mouseover tooltip
+			iQueue.ldb.OnLeave(anchor); -- hides the mouseover tooltip
 			_G.QueueStatusDropDown_Show(_G.QueueStatusMinimapButton.DropDown, anchor:GetName()); -- shows Blizzard tooltip for leaving instead
 			
 			if( not _G["DropDownList1"]:IsVisible() ) then
-				iQueue.Feed.OnEnter(anchor); -- re-shows the mouseover tooltip and hides Blizzard tooltip if clicked again
+				iQueue.ldb.OnEnter(anchor); -- re-shows the mouseover tooltip and hides Blizzard tooltip if clicked again
 			end
 		end
 	-- right click
@@ -94,20 +100,14 @@ iQueue.Feed.OnClick = function(anchor, button)
 	end
 end
 
-iQueue.Feed.OnEnter = function(anchor)
+iQueue.ldb.OnEnter = function(anchor)
 	-- does not show mouseover tooltip when not queued (or just available queue) or if Blizzard tooltip is visible
-	local queued = iQueue:IsQueued();
-	if( not queued or queued == 2 or _G["DropDownList1"]:IsVisible() ) then
+	local queued, paused = iQueue:IsQueued();
+	if( not queued or _G["DropDownList1"]:IsVisible() ) then
 		return;
 	end
 	
-	-- LibQTip has the power to show one or more tooltips, but on a broker bar, where more than one QTips are present, this is really disturbing.
-	-- So we release the tooltips of the i-Addons here.
-	for k, v in LibQTip:IterateTooltips() do
-		if( type(k) == "string" and strsub(k, 1, 6) == "iSuite" ) then
-			v:Release(k);
-		end
-	end
+	LibStub("iLib"):HideAllTooltips();
 	
 	-- the mouse over tooltip (Blizzard UI element) needs to be attached to Broker plugin
 	if( _G.QueueStatusFrame:GetParent() ~= anchor ) then
@@ -120,7 +120,7 @@ iQueue.Feed.OnEnter = function(anchor)
 	_G.QueueStatusFrame:Show();
 end
 
-iQueue.Feed.OnLeave = function(anchor)
+iQueue.ldb.OnLeave = function(anchor)
 	_G.QueueStatusFrame:Hide();
 end
 
@@ -128,13 +128,13 @@ end
 -- OnInitialize and Reset
 ------------------------------------------
 
-function iQueue:OnInitialize()
+function iQueue:Boot()
 	self.db = LibStub("AceDB-3.0"):New("iQueueDB", self:CreateDB(), "Default").profile;
-
-	self:UpdateBroker(); -- initially shows no queues and a grey icon
+	
+	_G.QueueStatusMinimapButton.Show = _G.QueueStatusMinimapButton.Hide;
+	_G.QueueStatusMinimapButton:Hide();
 	
 	-- All
-	self:RegisterEvent("PLAYER_ENTERING_WORLD", "EventHandler"); -- initial check if the player is in a queue
 	self:RegisterEvent("GROUP_ROSTER_UPDATE", "EventHandler"); -- when leaving a battlefield, no event is fired. So we check the group.
 	self:RegisterEvent("ZONE_CHANGED_NEW_AREA", "EventHandler"); -- need for loot rolling detection and world pvp areas
 	self:RegisterEvent("ZONE_CHANGED", "EventHandler"); -- need for loot rolling detection and world pvp areas
@@ -147,14 +147,162 @@ function iQueue:OnInitialize()
 	self:RegisterEvent("LFG_PROPOSAL_SHOW", "EventHandler");
 	self:RegisterEvent("LFG_QUEUE_STATUS_UPDATE", "EventHandler");
 	
-	self:DungeonComplete(); -- toggles LFG_COMPLETION_REWARD event, depending on the LeaveDungeon option
-	
 	-- PvP
 	self:RegisterEvent("UPDATE_BATTLEFIELD_STATUS", "EventHandler");
 	
 	-- World PvP
 	self:WatchWorldPvP(); -- toggles World PvP Area events, depending on the World PvP options
+	
+	self:DungeonComplete(); -- toggles LFG_COMPLETION_REWARD event, depending on the LeaveDungeon option
+	self:EventHandler("SELF_BOOT");
 end
+iQueue:RegisterEvent("PLAYER_ENTERING_WORLD", "Boot");
+
+---------------------------
+-- Event Handler
+---------------------------
+
+function iQueue:EventHandler(event)
+	-- see _DungeonComplete function. If the player leaves the group before the loot roll has ended, we need to reset it manually
+	-- We determine leaving the group by a simple zone change :)
+	if( event == "ZONE_CHANGED" and self.WatchLootRoll ) then
+		self:_DungeonComplete("reset");
+	end
+
+	-- check PvE queues
+	for i = 1, _G.NUM_LE_LFG_CATEGORYS do
+		local mode, submode = _G.GetLFGMode(i);
+		
+		if( not mode or mode == "abandonedInDungeon" ) then
+			Queues[i] = STATUS_NONE;
+			if( self["Queue"..i.."Current"] or self["Queue"..i.."Total"] ) then
+				self["Queue"..i.."Current"] = nil;
+				self["Queue"..i.."Total"] = nil;
+			end
+		elseif( mode == "suspended" ) then
+			Queues[i] = STATUS_PAUSED;
+		else			
+			if( mode == "lfgparty" ) then
+				Queues[i] = STATUS_ACTIVE;
+			elseif( mode == "proposal" ) then
+				Queues[i] = STATUS_PROPOSAL;
+			elseif( mode == "queued" ) then
+				Queues[i] = STATUS_QUEUED;
+				
+				local hasData, _, tankNeed, healNeed, dpsNeed, tankTotal, healTotal, dpsTotal = _G.GetLFGQueueStats(i);
+				local current, total;
+				
+				if( hasData ) then
+					total = tankTotal + healTotal + dpsTotal;
+					current = total - (tankNeed + healNeed + dpsNeed);
+					self["Queue"..i.."Current"] = current - 1; -- we sub the player from the needs, because he is always marked as "found"
+					self["Queue"..i.."Total"] = total - 1; -- we sub the player from the totals, see comment above
+				end
+			end
+		end
+	end
+	
+	-- check PvP queues
+	
+	-- There are one or two PvP queues available.
+	-- 1 queue if queueing for random BGs, 2 queues if queueing for specified BGs
+	-- We simply reset the PvP queue status and run our checks. This is a really clean way without declaring 1-2 helper vars.
+	Queues[QUEUE_PVP] = STATUS_NONE;
+	for i = 1, _G.GetMaxBattlefieldID() do
+		--local status, mapName, instanceID, levelRangeMin, levelRangeMax, teamSize, registeredMatch, eligibleInQueue, waitingOnOtherActivity = GetBattlefieldStatus(i);
+		local status = _G.GetBattlefieldStatus(i);
+		
+		if( status and status ~= "none" and status ~= "error" ) then
+			if( status == "active" ) then
+				status = STATUS_ACTIVE;
+			elseif( status == "confirm" ) then
+				status = STATUS_PROPOSAL;
+			elseif( status == "queued" ) then
+				status = STATUS_QUEUED;
+			end
+			
+			-- Because of 2 queues possible and just 1 PvP display, we store the "higher" queue status
+			Queues[QUEUE_PVP] = status > Queues[QUEUE_PVP] and status or Queues[QUEUE_PVP];
+		end
+	end
+	
+	-- check World PvP queues
+	if( self.db.WatchWorldPvP ) then
+		for area = 1, _G.GetNumWorldPVPAreas() do
+			local _, locName = _G.GetWorldPVPAreaInfo(area);
+			
+			local queued = false;
+			local mapName, status;
+			
+			-- The only way to identify a queued World PvP Area is to check its localized map name (e.g. Tol Barad)
+			-- Why? Well, I hardcoded WG/TB queue IDs (6 and 7), but GetWorldPVPQueueStatus() may also return TB as ID 1 (= 6 in iQueue, which is WG!)
+			for queue = 1, _G.MAX_WORLD_PVP_QUEUES do
+				status, mapName = _G.GetWorldPVPQueueStatus(queue);
+				if( mapName == locName ) then
+					queued = true;
+					break;
+				end
+			end
+			
+			local newStatus;
+			
+			-- this is our transporter variable. If it is set, the queue is active!
+			if( self["WorldPvP"..locName] ) then
+				newStatus = STATUS_PAUSED;
+			else
+				newStatus = STATUS_NONE;
+			end
+			
+			-- if we identified the queue, we store the queue status for it.
+			if( queued ) then
+				if( _G.GetRealZoneText() == locName ) then -- World PvP Areas have no "active" state in the Blizzard API, so we emulate it.
+					newStatus = STATUS_ACTIVE; -- iQueue assumes that you are playing a World PvP Area, if you are in the area.
+				elseif( status == "confirm" ) then
+					newStatus = STATUS_PROPOSAL;
+				elseif( status == "queued" ) then
+					newStatus = STATUS_QUEUED;
+				end
+			end
+			
+			Queues[QUEUE_PVP +area] = newStatus;
+		end
+	end
+		
+	self:UpdateBroker(); -- simply display our changes
+end
+
+----------------------
+-- Animated Eye
+----------------------
+
+local path = "Interface\\Addons\\iQueue\\Images\\eye";
+function iQueue:AnimateEye(state)
+	if( state ) then
+		self.animEye = self.animEye and self.animEye + 1 or 25;
+		self.animEye = self.animEye > 28 and 1 or self.animEye;
+		
+		self.ldb.icon = path..self.animEye;
+		
+		if( not EyeTimer ) then
+			EyeTimer = self:ScheduleRepeatingTimer("AnimateEye", 0.15, true);
+		end
+	else
+		self.animEye = nil;
+		
+		self.ldb.icon = path..(state == false and "eye1" or "off");
+		
+		if( EyeTimer ) then
+			self:CancelTimer(EyeTimer);
+			EyeTimer = nil;
+		end
+	end
+	
+	self.ldb.icon = icon;
+end
+
+--------------------------
+-- Dungeon Complete
+--------------------------
 
 function iQueue:DungeonComplete()
 	if( self.db.LeaveDungeonWhenFinished ) then
@@ -199,6 +347,10 @@ function iQueue:_DungeonComplete(event, ...)
 	end
 end
 
+-----------------------
+-- WatchWorldPvP
+-----------------------
+
 function iQueue:WatchWorldPvP()
 	-- if World PvP Areas should be watched, we need to register some events...
 	if( self.db.WatchWorldPvP ) then
@@ -209,14 +361,13 @@ function iQueue:WatchWorldPvP()
 			self:RegisterEvent("BATTLEFIELD_MGR_QUEUE_INVITE", "EventHandler");
 			self:RegisterEvent("BATTLEFIELD_MGR_ENTRY_INVITE", "EventHandler");
 			self:RegisterEvent("BATTLEFIELD_MGR_ENTERED", "EventHandler");
-			
 			self.WorldPvPEventsRegistered = 1;
 		end
 		
 		-- ...and if iQueue shall tell the player when to queue for WG/TB, we need to register a timer
 		if( self.db.WorldPvPTimer and not self.WorldPvPTimer ) then
 			self:CheckWorldPvPStatus();
-			self.WorldPvPTimer = LibStub("AceTimer-3.0"):ScheduleRepeatingTimer(iQueue.CheckWorldPvPStatus, 30);
+			self.WorldPvPTimer = self:ScheduleRepeatingTimer("CheckWorldPvPStatus", 30);
 		end
 	-- ...if watching isn't enabled, we check if we need to unregister the events
 	else
@@ -227,13 +378,12 @@ function iQueue:WatchWorldPvP()
 			self:UnregisterEvent("BATTLEFIELD_MGR_QUEUE_INVITE");
 			self:UnregisterEvent("BATTLEFIELD_MGR_ENTRY_INVITE");
 			self:UnregisterEvent("BATTLEFIELD_MGR_ENTERED");
-			
 			self.WorldPvPEventsRegistered = nil;
 		end
 		
 		-- ...and the timer
 		if( self.WorldPvPTimer ) then
-			LibStub("AceTimer-3.0"):CancelTimer(self.WorldPvPTimer);
+			self:CancelTimer(self.WorldPvPTimer);
 			self.WorldPvPTimer = nil;
 		end
 		
@@ -243,133 +393,36 @@ function iQueue:WatchWorldPvP()
 		end
 	end
 	
-	self:EventHandler("SELF_DUMP"); -- run the EventHandler to clear out remaining data
+	self:EventHandler("SELF_WORLD_PVP_CHECK"); -- run the EventHandler to clear out remaining data
 end
 
-function iQueue:CheckWorldPvPStatus()
-	local self = iQueue; -- didn't want to add AceTimer to my iQueue object, tho I must do shitty stuff like that
-	
-	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 3 ) then
-		self:CheckWorldPvPAlert(1); -- Wintergrasp
-	end
-	
-	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 4 ) then
-		self:CheckWorldPvPAlert(2); -- Tol Barad
-	end
-	
-	self:EventHandler("SELF_DUMP"); -- run the EventHandler to modify the queue display
-end
-
-function iQueue:CheckWorldPvPAlert(index)
+local function check_world_pvp_alert(index)
 	local pvpID, locName, isActive, canQueue, startTime, canEnter = _G.GetWorldPVPAreaInfo(index);
 	
 	if( canEnter ) then -- if the player cannot enter the World PvP Area, we don't check it
 		if( isActive or canQueue or startTime <= 900 ) then
-			self["WorldPvP"..locName] = 1; -- I don't wanna set the queue status here, so we set a transporter variable
+			iQueue["WorldPvP"..locName] = 1; -- I don't wanna set the queue status here, so we set a transporter variable
+			iQueue:EventHandler(iQueue, "SELF_WORLD_PVP_QUEUE_OPEN");
 			
 			-- remembers the player to queue for the World PvP Area
-			if( (time() - self.db.WorldPvPLastAlert[index]) >= 3600 ) then
+			if( (time() - iQueue.db.WorldPvPLastAlert[index]) >= 3600 ) then
 				_G.StaticPopup_Show("IQUEUE_WORLDPVPALARM");
-				self.db.WorldPvPLastAlert[index] = time(); -- we just want this popup once
+				iQueue.db.WorldPvPLastAlert[index] = time(); -- we just want this popup once
 			end
 		else
-			self["WorldPvP"..locName] = nil; -- if the queue isn't active (anymore), the transporter variable is cleared
+			iQueue["WorldPvP"..locName] = nil; -- if the queue isn't active (anymore), the transporter variable is cleared
 		end
 	end
 end
 
----------------------------
--- Event Handler
----------------------------
-
-function iQueue:EventHandler(event)
-	-- see _DungeonComplete function. If the player leaves the group before the loot roll has ended, we need to reset it manually
-	-- We determine leaving the group by a simple zone change :)
-	if( event == "ZONE_CHANGED" and self.WatchLootRoll ) then
-		self:_DungeonComplete("reset");
-	end
-
-	-- check PvE queues
-	for i = 1, _G.NUM_LE_LFG_CATEGORYS do
-		local mode, submode = _G.GetLFGMode(i);
-		
-		if( not mode or mode == "abandonedInDungeon" ) then
-			Queues[i] = STATUS_NONE;
-		else			
-			if( mode == "lfgparty" ) then
-				Queues[i] = STATUS_ACTIVE;
-			elseif( mode == "proposal" ) then
-				Queues[i] = STATUS_PROPOSAL;
-			elseif( mode == "queued" ) then
-				Queues[i] = STATUS_QUEUED;
-			end
-		end
+function iQueue:CheckWorldPvPStatus()
+	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 3 ) then
+		check_world_pvp_alert(1); -- Wintergrasp
 	end
 	
-	-- check PvP queues
-	
-	-- There are one or two PvP queues available.
-	-- 1 queue if queueing for random BGs, 2 queues if queueing for specified BGs
-	-- We simply reset the PvP queue status and run our checks. This is a really clean way without declaring 1-2 helper vars.
-	Queues[QUEUE_PVP] = STATUS_NONE;
-	for i = 1, _G.GetMaxBattlefieldID() do
-		--local status, mapName, instanceID, levelRangeMin, levelRangeMax, teamSize, registeredMatch, eligibleInQueue, waitingOnOtherActivity = GetBattlefieldStatus(i);
-		local status = _G.GetBattlefieldStatus(i);
-		
-		if( status and status ~= "none" and status ~= "error" ) then
-			if( status == "active" ) then
-				status = STATUS_ACTIVE;
-			elseif( status == "confirm" ) then
-				status = STATUS_PROPOSAL;
-			elseif( status == "queued" ) then
-				status = STATUS_QUEUED;
-			end
-			
-			-- Because of 2 queues possible and just 1 PvP display, we store the "higher" queue status
-			Queues[QUEUE_PVP] = status > Queues[QUEUE_PVP] and status or Queues[QUEUE_PVP];
-		end
+	if( self.db.WorldPvPPopup == 2 or self.db.WorldPvPPopup == 4 ) then
+		check_world_pvp_alert(2); -- Tol Barad
 	end
-	
-	-- check World PvP queues
-	if( self.db.WatchWorldPvP ) then
-		for i = 1, _G.MAX_WORLD_PVP_QUEUES do
-			--local status, mapName, queueID = GetWorldPVPQueueStatus(i);
-			local status, mapName = _G.GetWorldPVPQueueStatus(i);
-			local newStatus;
-			
-			-- this is our transporter variable. If it is set, the queue is active!
-			if( mapName and self["WorldPvP"..mapName] ) then
-				newStatus = STATUS_AVAIL;
-			else
-				newStatus = STATUS_NONE; -- otherwise STATUS_NONE is set.
-			end
-			
-			-- The only way to identify a queued World PvP Area is to check its localized map name (e.g. Tol Barad)
-			-- Why? Well, I hardcoded WG/TB queue IDs (6 and 7), but GetWorldPVPQueueStatus() may also return TB as ID 1 (= 6 in iQueue, which is WG!)			
-			local area = 0;
-			for j = 1, 2 do
-				local _, locName = _G.GetWorldPVPAreaInfo(j);
-				if( locName == mapName ) then
-					area = j;
-				end
-			end
-			
-			-- if we identified the queue, we store the queue status for it.
-			if( area ~= 0 ) then
-				if( _G.GetRealZoneText() == mapName ) then -- World PvP Areas have no "active" state in the Blizzard API, so we emulate it.
-					newStatus = STATUS_ACTIVE; -- iQueue assumes that you are playing a World PvP Area, if you are in the area.
-				elseif( status == "confirm" ) then
-					newStatus = STATUS_PROPOSAL;
-				elseif( status == "queued" ) then
-					newStatus = STATUS_QUEUED;
-				end
-				
-				Queues[QUEUE_PVP +area] = newStatus;
-			end
-		end
-	end
-		
-	self:UpdateBroker(); -- simply display our changes
 end
 
 ----------------------
@@ -377,63 +430,62 @@ end
 ----------------------
 
 function iQueue:IsQueued() -- returns 1 if queued somewhere (2 if just available queue), nil otherwise
-	local answer;
+	local answer, paused = false, false;
 	
 	for i, v in ipairs(Queues) do
-		if( v > STATUS_NONE ) then
-			if( v == STATUS_AVAIL and not answer ) then
-				answer = 2;
-			elseif( v > STATUS_AVAIL ) then
-				answer = 1;
-			end
+		if( v > STATUS_PAUSED ) then
+			answer = true;
+		elseif( v == STATUS_PAUSED ) then
+			paused = true;
 		end
 	end
 	
-	return answer;
+	return answer, paused;
+end
+
+local function get_queue_name(queue)
+	-- simply gets an abbreviation for the queue (e.g. Looking for Dungeon = LFG)
+	if    ( queue == QUEUE_LFG ) then return "LFG"
+	elseif( queue == QUEUE_RF  ) then return "RF"
+	elseif( queue == QUEUE_SCE ) then return "SCE"
+	elseif( queue == QUEUE_LFR ) then return "LFR"
+	elseif( queue == QUEUE_PVP ) then return "PvP"
+	elseif( queue  > QUEUE_PVP ) then -- uhhh... hard coding sucks -.-
+		if(     (queue - QUEUE_PVP) == 1 ) then return "WG"
+		elseif( (queue - QUEUE_PVP) == 2 ) then return "TB"
+		end
+	else
+		return _G.UNKNOWN; -- should NEVER happen!
+	end
 end
 
 function iQueue:UpdateBroker()
 	-- by default, iQueue assumes that no queues are active
 	local text = "";
-	local icon = ICON_LFG_OFF;
+	
+	local queued, paused = self:IsQueued();
+	local name, color, active;
 	
 	-- if at least one queue is active, we loop thru our Queues table
-	if( self:IsQueued() ) then
-		local name;
-		local color;
-		
+	if( queued or paused ) then		
 		for q, v in ipairs(Queues) do
 			-- the queue status must be ~= STATUS_NONE in order to display a queue
 			if( v ~= STATUS_NONE ) then
-				-- simply gets an abbreviation for the queue (e.g. Looking for Dungeon = LFG)
-				if( q == QUEUE_LFG ) then
-					name = "LFG";
-				elseif( q == QUEUE_RF ) then
-					name = "RF";
-				elseif( q == QUEUE_SCE ) then
-					name = "SCE";
-				elseif( q == QUEUE_LFR ) then
-					name = "LFR";
-				elseif( q == QUEUE_PVP ) then
-					name = "PvP";
-				elseif( q > QUEUE_PVP ) then -- uhhh... hard coding sucks -.-
-					if( (q - QUEUE_PVP) == 1 ) then
-						name = "WG";
-					elseif( (q - QUEUE_PVP) == 2 ) then
-						name = "TB";
-					end
-				else
-					name = _G.UNKNOWN; -- should NEVER happen!
-				end
+				name = get_queue_name(q);
 				
 				-- colorizing the queue name abbreviation
 				if( v == STATUS_QUEUED ) then
-					color = COLOR_RED;
+					if( self["Queue"..q.."Current"] and self["Queue"..q.."Total"] ) then
+						color = "|cff"..LibCrayon:GetThresholdHexColor(self["Queue"..q.."Current"], self["Queue"..q.."Total"]*2).."%s|r";
+					else
+						color = COLOR_RED;
+					end
 				elseif( v == STATUS_PROPOSAL ) then
 					color = COLOR_YELLOW;
 				elseif( v == STATUS_ACTIVE ) then
 					color = COLOR_GREEN;
-				elseif( v == STATUS_AVAIL ) then
+					active = true;
+				elseif( v == STATUS_PAUSED ) then
 					color = COLOR_GREY;
 				end
 				
@@ -442,11 +494,16 @@ function iQueue:UpdateBroker()
 			end
 		end
 		
-		icon = ICON_LFG_ON; -- if queued, the icon shall be green
+		if( queued ) then
+			self:AnimateEye(not active);
+		end
 	end
 	
-	self.Feed.text = text;
-	self.Feed.icon = icon;
+	if( not queued ) then
+		self:AnimateEye();
+	end
+	
+	self.ldb.text = text;
 end
 
 ---------------------
@@ -457,7 +514,7 @@ _G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"] = {
 	preferredIndex = 3, -- apparently avoids some UI taint
 	text = "A World PvP Area is ready to be queued!",
 	button1 = "Enter",
-	button2 = "Cancel",
+	button2 = _G.CANCEL,
 	timeout = 900,
 	whileDead = true,
 	hideOnEscape = true,
@@ -469,8 +526,8 @@ _G.StaticPopupDialogs["IQUEUE_WORLDPVPALARM"] = {
 _G.StaticPopupDialogs["IQUEUE_DUNGEONEND"] = {
 	preferredIndex = 3, -- apparently avoids some UI taint
 	text = "The dungeon is cleared and loot is assigned to players. Leave group?",
-	button1 = "Yes",
-	button2 = "No",
+	button1 = _G.YES,
+	button2 = _G.NO,
 	timeout = 900,
 	whileDead = true,
 	hideOnEscape = true,

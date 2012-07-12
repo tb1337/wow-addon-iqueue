@@ -2,10 +2,28 @@
 -- Get the addon table
 -----------------------------
 
-local AddonName = select(1, ...);
-local iQueue = LibStub("AceAddon-3.0"):GetAddon(AddonName);
+local AddonName, iQueue = ...;
 
 local L = LibStub("AceLocale-3.0"):GetLocale(AddonName);
+
+local _G = _G;
+
+--------------------------
+-- The option table
+--------------------------
+
+function iQueue:CreateDB()
+	iQueue.CreateDB = nil;
+	
+	return { profile = {
+		LeaveDungeonWhenFinished = true,
+		LeaveDungeonAction = 1,
+		WatchWorldPvP = false,
+		WorldPvPTimer = false,
+		WorldPvPPopup = 2,
+		WorldPvPLastAlert = { 0, 0 }, -- we save last alert times for both WG and TB
+	}};
+end
 
 ---------------------------------
 -- The configuration table
@@ -62,7 +80,7 @@ local function CreateConfig()
 				args = {
 					Description1 = {
 						type = "description",
-						name = "As of Mists of Pandaria, World PvP Areas are deprecated. If you would like to farm achievements or something else, you may enable World PvP handling for iQueue.".."\n",
+						name = "As of Mists of Pandaria, World PvP Areas are deprecated. If you would like to farm achievements or something else, you may enable World PvP handling in iQueue.".."\n",
 						fontSize = "medium",
 						order = 10,
 					},
@@ -120,19 +138,6 @@ local function CreateConfig()
 	};
 	
 	return db;
-end
-
-function iQueue:CreateDB()
-	iQueue.CreateDB = nil;
-	
-	return { profile = {
-		LeaveDungeonWhenFinished = true,
-		LeaveDungeonAction = 1,
-		WatchWorldPvP = false,
-		WorldPvPTimer = false,
-		WorldPvPPopup = 2,
-		WorldPvPLastAlert = { 0, 0 }, -- we save last alert times for both WG and TB
-	}};
 end
 
 function iQueue:OpenOptions()
