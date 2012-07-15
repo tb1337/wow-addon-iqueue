@@ -39,7 +39,8 @@ local QUEUE_LFG 		= _G.LE_LFG_CATEGORY_LFD; -- ID for lfg dungeons used by Blizz
 local QUEUE_RF  		= _G.LE_LFG_CATEGORY_RF; -- ID for raid finder used by Blizzard
 local QUEUE_SCE 		= _G.LE_LFG_CATEGORY_SCENARIO; -- ID for scenarios used by Blizzard
 local QUEUE_LFR 		= _G.LE_LFG_CATEGORY_LFR; -- ID for LFR used by Blizzard
-local QUEUE_PVP 		= _G.NUM_LE_LFG_CATEGORYS +1; -- virtual queue ID for PvP queues, set by me (should be 5)
+local QUEUE_PET			= _G.NUM_LE_LFG_CATEGORYS +1; -- virtual queue ID for pet battles
+local QUEUE_PVP 		= _G.NUM_LE_LFG_CATEGORYS +2; -- virtual queue ID for PvP queues, set by me (should be 5)
 local QUEUE_WG			= QUEUE_PVP +1; -- queue ID for Wintergrasp (should be 6)
 local QUEUE_TB			= QUEUE_PVP +2; -- queue ID for Tol Barad (should be 7)
 
@@ -48,6 +49,7 @@ local Queues = { -- Stores a status for each queue category, defaults to STATUS_
 	[QUEUE_RF]  = STATUS_NONE,
 	[QUEUE_SCE] = STATUS_NONE,
 	[QUEUE_LFR] = STATUS_NONE,
+	[QUEUE_PET] = STATUS_NONE,
 	[QUEUE_PVP] = STATUS_NONE,
 	[QUEUE_WG]  = STATUS_NONE,
 	[QUEUE_TB]	= STATUS_NONE,
@@ -149,6 +151,9 @@ function iQueue:Boot()
 	-- PvP
 	self:RegisterEvent("UPDATE_BATTLEFIELD_STATUS", "EventHandler");
 	
+	-- Pet Battles
+	self:RegisterEvent("PET_BATTLE_QUEUE_STATUS", "EventHandler");
+	
 	-- World PvP
 	self:WatchWorldPvP(); -- toggles World PvP Area events, depending on the World PvP options
 	
@@ -167,10 +172,12 @@ function iQueue:EventHandler(event)
 	if( event == "ZONE_CHANGED" and self.WatchLootRoll ) then
 		self:_DungeonComplete("reset");
 	end
+	
+	local mode, submode;
 
 	-- check PvE queues
 	for i = 1, _G.NUM_LE_LFG_CATEGORYS do
-		local mode, submode = _G.GetLFGMode(i);
+		mode, submode = _G.GetLFGMode(i);
 		
 		if( not mode or mode == "abandonedInDungeon" ) then
 			Queues[i] = STATUS_NONE;
@@ -223,6 +230,20 @@ function iQueue:EventHandler(event)
 			-- Because of 2 queues possible and just 1 PvP display, we store the "higher" queue status
 			Queues[QUEUE_PVP] = status > Queues[QUEUE_PVP] and status or Queues[QUEUE_PVP];
 		end
+	end
+	
+	-- check pet battles
+	mode = _G.C_PetBattles.GetPVPMatchmakingInfo();
+	if( mode == "queued" ) then
+		Queues[QUEUE_PET] = STATUS_QUEUED;
+	elseif( mode == "suspended" ) then
+		Queues[QUEUE_PET] = STATUS_PAUSED;
+	elseif( mode == "proposal" ) then
+		Queues[QUEUE_PET] = STATUS_PROPOSAL;
+	elseif( mode == "entry" ) then
+		Queues[QUEUE_PET] = STATUS_ACTIVE;
+	else
+		Queues[QUEUE_PET] = STATUS_NONE
 	end
 	
 	-- check World PvP queues
@@ -447,6 +468,7 @@ local function get_queue_name(queue)
 	elseif( queue == QUEUE_RF  ) then return L["RF"]
 	elseif( queue == QUEUE_SCE ) then return L["SCE"]
 	elseif( queue == QUEUE_LFR ) then return L["LFR"]
+	elseif( queue == QUEUE_PET ) then return "PET"
 	elseif( queue == QUEUE_PVP ) then return _G.PVP
 	elseif( queue  > QUEUE_PVP ) then -- uhhh... hard coding sucks -.-
 		if(     (queue - QUEUE_PVP) == 1 ) then return L["WG"]
