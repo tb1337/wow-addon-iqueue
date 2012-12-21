@@ -130,8 +130,8 @@ end
 function iQueue:Boot()
 	self.db = LibStub("AceDB-3.0"):New("iQueueDB", self:CreateDB(), "Default").profile;
 	
-	_G.QueueStatusMinimapButton.Show = _G.QueueStatusMinimapButton.Hide;
-	_G.QueueStatusMinimapButton:Hide();
+	--_G.QueueStatusMinimapButton.Show = _G.QueueStatusMinimapButton.Hide;
+	--_G.QueueStatusMinimapButton:Hide();
 	
 	-- All
 	self:RegisterEvent("GROUP_ROSTER_UPDATE", "EventHandler"); -- when leaving a battlefield, no event is fired. So we check the group.
