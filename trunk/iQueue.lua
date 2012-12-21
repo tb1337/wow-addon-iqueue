@@ -108,8 +108,6 @@ iQueue.ldb.OnEnter = function(anchor)
 		return;
 	end
 	
-	LibStub("iLib"):HideAllTooltips();
-	
 	-- the mouse over tooltip (Blizzard UI element) needs to be attached to Broker plugin
 	if( _G.QueueStatusFrame:GetParent() ~= anchor ) then
 		_G.QueueStatusFrame:ClearAllPoints();
