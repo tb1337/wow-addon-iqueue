@@ -16,7 +16,7 @@ local _G = _G;
 -- Registering with iLib
 -------------------------------
 
-LibStub("iLib"):Register(AddonName);
+LibStub("iLib"):Register(AddonName, nil, iQueue);
 
 -----------------------------------------
 -- Variables, functions and colors
@@ -64,6 +64,19 @@ iQueue.ldb = LibStub("LibDataBroker-1.1"):NewDataObject(AddonName, {
 	text = "",
 });
 
+local function update_tooltip(tip)
+	tip:SetColumnLayout(1, "CENTER");
+	tip:AddHeader("|cffff0000Under Construction|r");
+	tip:AddLine("Blizzard protected API functions because of BG botters.");
+	tip:AddLine("Leaving PvP queues isn't available to addons such as iQueue anymore.");
+	tip:AddLine("The only way to leave BG queues is clicking the LFG minimap icon.");
+	tip:AddLine("Thus iQueue needs a recode. Expect an update after xmas.");
+	tip:AddLine(" ");
+	tip:AddLine("Yours, grdn");
+	tip:AddLine(" ");
+	tip:AddLine("Click one more time to hide this message again.");
+end
+
 iQueue.ldb.OnClick = function(anchor, button)
 	-- left click
 	if( button == "LeftButton" ) then
@@ -79,11 +92,21 @@ iQueue.ldb.OnClick = function(anchor, button)
 				return;
 			end
 			
-			iQueue.ldb.OnLeave(anchor); -- hides the mouseover tooltip
-			_G.QueueStatusDropDown_Show(_G.QueueStatusMinimapButton.DropDown, anchor:GetName()); -- shows Blizzard tooltip for leaving instead
+			--iQueue.ldb.OnLeave(anchor); -- hides the mouseover tooltip
+			--_G.QueueStatusDropDown_Show(_G.QueueStatusMinimapButton.DropDown, anchor:GetName()); -- shows Blizzard tooltip for leaving instead
 			
-			if( not _G["DropDownList1"]:IsVisible() ) then
-				iQueue.ldb.OnEnter(anchor); -- re-shows the mouseover tooltip and hides Blizzard tooltip if clicked again
+			--if( not _G["DropDownList1"]:IsVisible() ) then
+			--	iQueue.ldb.OnEnter(anchor); -- re-shows the mouseover tooltip and hides Blizzard tooltip if clicked again
+			--end
+			
+			if( iQueue:IsTooltip("Main") ) then
+				iQueue:GetTooltip("Main"):Release();
+				iQueue.ldb.OnEnter(anchor);
+			else
+				iQueue.ldb.OnLeave(anchor);
+				local tip = iQueue:GetTooltip("Main", update_tooltip);
+				tip:SmartAnchorTo(anchor);
+				tip:Show();
 			end
 		end
 	-- right click
@@ -104,7 +127,7 @@ end
 iQueue.ldb.OnEnter = function(anchor)
 	-- does not show mouseover tooltip when not queued (or just available queue) or if Blizzard tooltip is visible
 	local queued, paused = iQueue:IsQueued();
-	if( not queued or _G["DropDownList1"]:IsVisible() ) then
+	if( not queued or iQueue:IsTooltip("Main") ) then --_G["DropDownList1"]:IsVisible() ) then
 		return;
 	end
 	
@@ -314,8 +337,6 @@ function iQueue:AnimateEye(state)
 			EyeTimer = nil;
 		end
 	end
-	
-	self.ldb.icon = icon;
 end
 
 --------------------------
