@@ -24,6 +24,7 @@ LibStub("iLib"):Register(AddonName, nil, iQueue);
 
 local EyeTimer; -- the timer for our animated eyeball
 
+local COLOR_GOLD = "|cfffed100%s|r";
 local COLOR_RED  = "|cffff0000%s|r";
 local COLOR_GREEN= "|cff00ff00%s|r";
 local COLOR_YELLOW= "|cffffff00%s|r";
@@ -64,19 +65,6 @@ iQueue.ldb = LibStub("LibDataBroker-1.1"):NewDataObject(AddonName, {
 	text = "",
 });
 
-local function update_tooltip(tip)
-	tip:SetColumnLayout(1, "CENTER");
-	tip:AddHeader("|cffff0000Under Construction|r");
-	tip:AddLine("Blizzard protected API functions because of BG botters.");
-	tip:AddLine("Leaving PvP queues isn't available to addons such as iQueue anymore.");
-	tip:AddLine("The only way to leave BG queues is clicking the LFG minimap icon.");
-	tip:AddLine("Thus iQueue needs a recode. Expect an update after xmas.");
-	tip:AddLine(" ");
-	tip:AddLine("Yours, grdn");
-	tip:AddLine(" ");
-	tip:AddLine("Click one more time to hide this message again.");
-end
-
 iQueue.ldb.OnClick = function(anchor, button)
 	-- left click
 	if( button == "LeftButton" ) then
@@ -88,26 +76,9 @@ iQueue.ldb.OnClick = function(anchor, button)
 			end
 		else
 			-- no modifier pressed, but if not queued, no action is done
-			if( not iQueue:IsQueued() ) then
-				return;
-			end
-			
-			--iQueue.ldb.OnLeave(anchor); -- hides the mouseover tooltip
-			--_G.QueueStatusDropDown_Show(_G.QueueStatusMinimapButton.DropDown, anchor:GetName()); -- shows Blizzard tooltip for leaving instead
-			
-			--if( not _G["DropDownList1"]:IsVisible() ) then
-			--	iQueue.ldb.OnEnter(anchor); -- re-shows the mouseover tooltip and hides Blizzard tooltip if clicked again
+			--if( not iQueue:IsQueued() ) then
+			--	return;
 			--end
-			
-			if( iQueue:IsTooltip("Main") ) then
-				iQueue:GetTooltip("Main"):Release();
-				iQueue.ldb.OnEnter(anchor);
-			else
-				iQueue.ldb.OnLeave(anchor);
-				local tip = iQueue:GetTooltip("Main", update_tooltip);
-				tip:SmartAnchorTo(anchor);
-				tip:Show();
-			end
 		end
 	-- right click
 	elseif( button == "RightButton" ) then
@@ -132,12 +103,12 @@ iQueue.ldb.OnEnter = function(anchor)
 	end
 	
 	-- the mouse over tooltip (Blizzard UI element) needs to be attached to Broker plugin
-	if( _G.QueueStatusFrame:GetParent() ~= anchor ) then
-		_G.QueueStatusFrame:ClearAllPoints();
-		_G.QueueStatusFrame:SetParent(anchor);
-		_G.QueueStatusFrame:SetClampedToScreen(true);
-		_G.QueueStatusFrame:SetPoint("TOP", anchor, "TOP", 14, -anchor:GetHeight());
-	end
+	--if( _G.QueueStatusFrame:GetParent() ~= anchor ) then
+	--	_G.QueueStatusFrame:ClearAllPoints();
+	--	_G.QueueStatusFrame:SetParent(anchor);
+	--	_G.QueueStatusFrame:SetClampedToScreen(true);
+	--	_G.QueueStatusFrame:SetPoint("TOP", anchor, "TOP", 14, -anchor:GetHeight());
+	--end
 	
 	_G.QueueStatusFrame:Show();
 end
