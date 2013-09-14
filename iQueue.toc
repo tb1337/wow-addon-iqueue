@@ -1,6 +1,6 @@
-## Interface: 50200
+## Interface: 50400
 ## Title: i|cffffffaaQueue|r
-## Version: 2.1.0
+## Version: 5.4-r1
 ## Notes: The ultimate LFD and PvP Queue LDB addon!
 ## Author: grdn
 ## SavedVariables: iQueueDB
