@@ -1,0 +1,9 @@
+## Interface: 80000
+## Title: i|cffffffaaQueue|r
+## Version: 8.0.3
+## Notes: The ultimate LFD and PvP Queue LDB addon!
+## Author: grdn
+## SavedVariables: iQueueDB
+## OptionalDeps: Ace3, iLib, LibCrayon-3.0
+
+includes.xml
